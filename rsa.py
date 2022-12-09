@@ -8,8 +8,8 @@ import os
 def find_decrypt_key(message, dir="key_pairs/"):
     # iterate through all the keys in the directory
     for file in os.listdir(dir):
-        # TODO: what type of key should we filter out?
-        if not file.endswith("TO BE FILLED HERE"): 
+        # filter through private keys
+        if not file.endswith("priv.pem"): 
             continue # skip to the next file
         elif decrypt_message(message, dir + file, "temp.txt"): # if the decryption is successful
             os.remove("temp.txt") # remove the temporary file
@@ -27,40 +27,54 @@ def generate_keys(public_fname="public.pem", private_fname="private.pem"):
     key = RSA.generate(2048)
 
     # ======= public key =======
-    # TODO: extract the public key
-
-    # TODO: save the public key in a file called public.pem
-
+    # extract the public key
+    public_key = key.publickey().exportKey()
+    
+    # save the public key in a file called public.pem
+    with open(public_fname, 'wb') as f:
+        f.write(public_key)
+        
     # ======= private key =======
-    # TODO: extract the private key
-
-    # TODO: save the private key in a file called private.pem
+    # extract the private key
+    private_key = key.privatekey().exportKey()
+    
+    # save the private key in a file called private.pem
+    with open(private_fname, 'wb') as f:
+        f.write(private_key)
 
 # Encrypt a message using a public key
 def encrypt_message(message, pub_key_path, out_fname="encrypted.txt"):
-    # TODO: open the file to write the encrypted message
-
-    # TODO: encrypt the message with the public RSA key using PKCS1_OAEP
-
-    # TODO: write the encrypted message to the file
-
-    # TODO: close the file
-    
-    pass # remove this line when you implement the function
+    # open the file to write the encrypted message
+    with open(out_fname, 'wb') as f:
+        # read public key
+        with open(pub_key_path, 'rb') as p:
+            public_key_pem = p.read()
+        public_key = RSA.importKey(public_key_pem)
+        
+        # encrypt the message with the public RSA key using PKCS1_OAEP
+        enc_message = PKCS1_OAEP.encrypt(public_key, message)
+        # write the encrypted message to the file
+        f.write(enc_message)
 
 # Decrypt a message using a private key
 def decrypt_message(message, priv_key_path, out_fname="decrypted.txt"):
-    # TODO: open the file to write the decrypted message
-
+    # open the file to write the decrypted message
+    f = open(out_fname, 'wb')
     # decrypt the message with the private RSA key using PKCS1_OAEP
     # and return True if the decryption is successful
     try:
-        # TODO: import private key and generate cipher using PKCS1_OAEP
+        # import private key and generate cipher using PKCS1_OAEP
+        with open(priv_key_path, 'rb') as p:
+            private_key_pem = p.read()
+        private_key = RSA.importKey(private_key_pem)
+        cipher = PKCS1_OAEP.new(private_key)
+        dec_message = cipher.decrypt(message)
         
-        # TODO: write the decrypted message to the file
-
-        # TODO: close the file
-
+        # write the decrypted message to the file
+        f.write(dec_message)
+        # close the file
+        f.close()
+        
         # return True if decryption is successful
         print("The private key is valid.")
         return True
@@ -68,6 +82,7 @@ def decrypt_message(message, priv_key_path, out_fname="decrypted.txt"):
     except ValueError:
         # return False if decryption is unsuccessful
         print("The private key is invalid.")
+        f.close()
         return False
 
 # Sign a message using a private key
@@ -119,26 +134,29 @@ if __name__ == "__main__":
         option = input('Choose a menu option: ')
         if option == "a":
             # part a.1: generate public and private keys
-            # TODO
+            generate_keys("public.pem", "private.pem")
            
             # part a.2: ask a message to be encrypted and encrypt it
             message = input("Enter a message to be encrypted: ")
             message = message.encode()
             public_key_path = "public.pem"
-            # TODO: call the encrypt_message function
+            # call the encrypt_message function
+            encrypt_message(message, public_key_path, "encrypted.txt")
 
             # part a.3: decrypt that exact message and output it to a file 
             #           called decrypted.txt
             public_key_path = "private.pem"
             encrypted_message = open("encrypted.txt", "rb").read()
-            # TODO: call the decrypt_message function
+            # call the decrypt_message function
+            decrypt_message(encrypted_message, public_key_path, "decrypted.txt")
             
         elif option == "b":
             # part b: decrypt the message given in sus.txt using one of the keys in key_pairs
             #         and output the decrypted message to a file called sus_decrypted.txt
             #         HINT: use the find_decrypt_key function to your advantage
             message = open("sus.txt", "rb").read()
-            # TODO
+            corr_priv_key_pem = find_decrypt_key(message)
+            decrypt_message(message, corr_priv_key_pem, "sus_decrypted.txt")
 
         elif option == "c":
             # part c.1: sign a message using the private key from part a.1
