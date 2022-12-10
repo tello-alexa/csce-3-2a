@@ -16,9 +16,13 @@ def find_decrypt_key(message, dir="key_pairs/"):
             return dir + file # return the private key file name
 
 def find_sign_key(message, signature, dir="key_pairs/"):
-    # [IMPLEMENT THIS FUNCTION TO RETURN THE PATH TOWARDS THE PUBLIC KEY]
-    # TODO
-    pass # remove this line when you implement the function
+    # iterate through all the keys in the directory
+    for file in os.listdir(dir):
+        # filter through public keys
+        if not file.endswith("pub.pem"): 
+            continue # skip to the next file
+        elif verify_message(message, signature, dir + file): # if the signature is verified
+            return dir + file # return the public key file name
 
 # ======== main functions ========
 # Generate a public/private key pair using 2048 bits key length
@@ -28,19 +32,19 @@ def generate_keys(public_fname="public.pem", private_fname="private.pem"):
 
     # ======= public key =======
     # extract the public key
-    public_key = key.publickey().exportKey()
+    public_key = key.publickey()
     
     # save the public key in a file called public.pem
     with open(public_fname, 'wb') as f:
-        f.write(public_key)
+        f.write(public_key.exportKey("PEM"))
         
     # ======= private key =======
     # extract the private key
-    private_key = key.privatekey().exportKey()
+    private_key = key
     
     # save the private key in a file called private.pem
     with open(private_fname, 'wb') as f:
-        f.write(private_key)
+        f.write(private_key.exportKey("PEM"))
 
 # Encrypt a message using a public key
 def encrypt_message(message, pub_key_path, out_fname="encrypted.txt"):
@@ -52,7 +56,8 @@ def encrypt_message(message, pub_key_path, out_fname="encrypted.txt"):
         public_key = RSA.importKey(public_key_pem)
         
         # encrypt the message with the public RSA key using PKCS1_OAEP
-        enc_message = PKCS1_OAEP.encrypt(public_key, message)
+        cipher = PKCS1_OAEP.new(public_key)
+        enc_message = cipher.encrypt(message)
         # write the encrypted message to the file
         f.write(enc_message)
 
@@ -87,30 +92,41 @@ def decrypt_message(message, priv_key_path, out_fname="decrypted.txt"):
 
 # Sign a message using a private key
 def sign_message(message, priv_key_path, out_fname="signed_msg.txt"):
-    # TODO: open the file to write the signature
+    # open the file to write the signature
+    f = open(out_fname, 'wb')
+    
+    # import private key
+    with open(priv_key_path, 'rb') as p:
+        private_key_pem = p.read()
+    private_key = RSA.importKey(private_key_pem)
+        
+    # hash the message with SHA256
+    hashed = SHA256.new(message)
+    
+    # sign the message with the private RSA key using pkcs1_15
+    signature = pkcs1_15.new(private_key).sign(hashed)
 
-    # TODO: import private key
+    # write the signature to the file
+    f.write(signature)
 
-    # TODO: hash the message with SHA256
-
-    # TODO: sign the message with the private RSA key using pkcs1_15
-
-    # TODO: write the signature to the file
-
-    # TODO: close the file
-
-    pass # remove this line when you implement the function
+    # close the file
+    f.close()
 
 # Verify a message using a public key
 def verify_message(message, signature, public_key_path):
-    # TODO: import public key
-
-    # TODO: hash the message with SHA256
+    # import public key
+    with open(public_key_path, 'rb') as p:
+        public_key_pem = p.read()
+    public_key = RSA.importKey(public_key_pem)
+        
+    # hash the message with SHA256
+    hashed = SHA256.new(message)
 
     # verify the signature with the public RSA key using pkcs1_15
     try:
-        # TODO: verify the signature
-
+        # verify the signature
+        sign = pkcs1_15.new(public_key)
+        sign.verify(hashed, signature)
         print("The signature is valid.")
         return True
     except (ValueError, TypeError):
@@ -164,13 +180,15 @@ if __name__ == "__main__":
             message = input("Enter a message to be signed: ")
             message = message.encode()
             private_key_path = "private.pem"
-            # TODO: call the sign_message function
-
+            # call the sign_message function
+            sign_message(message, private_key_path, "signed_msg.txt")
+            
             # part c.2: verify the signature of the message using 
             #           the public key from part a.1 
             public_key_path = "public.pem"
             signature = open("signed_msg.txt", "rb").read()
-            # TODO: call the verify_message function
+            # call the verify_message function
+            verify_message(message, signature, public_key_path)
         
         elif option == "d":
             # part d: identify the real Reveille's signature
@@ -184,7 +202,8 @@ if __name__ == "__main__":
             #           correct key, you will get full credit
             message = open("sus_decrypted.txt", "rb").read()
             signature = open("rev.txt", "rb").read()
-            # TODO
+            corr_pub_key_pem = find_sign_key(message, signature)
+            verify_message(message, signature, corr_pub_key_pem)
             
         elif option == "q":
             break
